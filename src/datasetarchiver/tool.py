@@ -92,7 +92,7 @@ def main(args=None):
 
     if args.command == "create":
         archive_dataset(
-            args.dataset_dir, args.archives_path, json.loads(args.meta_data)
+            Path(args.dataset_dir), Path(args.archives_path), json.loads(args.meta_data)
         )
     if args.command == "extract":
-        extract_dataset(args.dataset_archive, args.extract_path)
+        extract_dataset(Path(args.dataset_archive), Path(args.extract_path))
