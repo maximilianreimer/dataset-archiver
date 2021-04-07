@@ -4,7 +4,7 @@ import sys
 
 from pathlib import Path
 
-from src.datasetarchiver.archiver import archive_dataset, extract_dataset
+from datasetarchiver.archiver import archive_dataset, extract_dataset
 
 
 def is_valid_file(arg):
