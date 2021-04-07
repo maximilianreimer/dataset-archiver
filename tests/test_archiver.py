@@ -5,8 +5,8 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from datasetarchiver import archiver
-from datasetarchiver.archiver import archive_dataset, extract_dataset, md5
+from src.datasetarchiver import archiver
+from src.datasetarchiver.archiver import archive_dataset, extract_dataset, md5
 
 
 class TestArchiver(unittest.TestCase):
