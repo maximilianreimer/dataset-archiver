@@ -6,6 +6,7 @@ import unittest
 from pathlib import Path
 
 from datasetarchiver import archiver
+from datasetarchiver.archiver import archive_dataset, extract_dataset, md5
 
 
 class TestArchiver(unittest.TestCase):
@@ -115,6 +116,40 @@ class TestArchiver(unittest.TestCase):
                     del meta1["creation_date"]
                     del meta2["creation_date"]
                     self.assertDictEqual(meta1, meta2)
+
+    def test_extract(self):
+        source_dataset = Path("test_data/movies")
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_dir = Path(temp_dir)
+
+            archive_path = archive_dataset(source_dataset, temp_dir)
+            extracted_dataset = extract_dataset(archive_path, temp_dir)
+
+            source_files = map(
+                lambda path: path.relative_to(source_dataset), source_dataset.rglob("*")
+            )
+            extracted_files = map(
+                lambda path: path.relative_to(extracted_dataset),
+                extracted_dataset.rglob("*"),
+            )
+
+            sorted_source_files = sorted(source_files, key=lambda path: str(path))
+            sorted_extracted_files = sorted(extracted_files, key=lambda path: str(path))
+
+            self.assertListEqual(
+                [str(file) for file in sorted_source_files],
+                [str(file) for file in sorted_extracted_files],
+            )
+
+            for source_file, extracted_file in zip(
+                sorted_source_files, sorted_extracted_files
+            ):
+                abs_source_file = source_dataset / source_file
+                abs_extracted_file = extracted_dataset / extracted_file
+                if abs_extracted_file.is_dir():
+                    continue
+                self.assertEqual(md5(abs_source_file), md5(abs_extracted_file))
 
 
 if __name__ == "__main__":

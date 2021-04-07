@@ -1,5 +1,6 @@
 import hashlib
 import os
+import shutil
 import tarfile
 import tempfile
 
@@ -39,7 +40,6 @@ def reset_tar_info(tar_info: tarfile.TarInfo):
 
     RESET_FIELDS = {
         "mtime": 0,
-        "mode": 420,
         "uid": 0,
         "gid": 0,
         "uname": "",
@@ -86,7 +86,7 @@ def archive_raw_dataset(
     )
     tar_file_path = archive_path / f"{archive_name}.tar.{COMPRESSION_TYPE}"
     with tarfile.open(tar_file_path, f"x:{COMPRESSION_TYPE}") as tar_file:
-        tar_file.add(source_path, arcname="data", filter=all_but_meta)
+        tar_file.add(source_path, arcname="", filter=all_but_meta)
     return tar_file_path
 
 
@@ -147,3 +147,20 @@ def archive_dataset(
             archive_name,
             [(meta_file, META_DATA_FILE), (temp_tar, temp_tar.name)],
         )
+
+
+def extract_dataset(archive_path: Path, target_path: Path):
+    with tempfile.TemporaryDirectory() as temp_dir:
+        temp_dir = Path(temp_dir)
+        with tarfile.open(archive_path, "r") as archive_file:
+            archive_file.extractall(temp_dir)
+
+        meta = load_meta_file(temp_dir)
+        dataset_path = target_path / meta["name"]
+        dataset_path.mkdir(exist_ok=False, parents=True)
+
+        shutil.copy(temp_dir / META_DATA_FILE, dataset_path / META_DATA_FILE)
+        with tarfile.open(temp_dir / "data.tar.gz") as data_tar:
+            data_tar.extractall(dataset_path)
+
+        return dataset_path
