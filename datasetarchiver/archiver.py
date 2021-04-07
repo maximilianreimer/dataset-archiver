@@ -1,4 +1,5 @@
 import hashlib
+import os
 import tarfile
 import tempfile
 
@@ -8,9 +9,8 @@ from os import PathLike
 
 from pathlib import Path
 from typing import List, Tuple
-from zipfile import ZipFile
 
-META_DATA_FILE = 'meta.json'
+META_DATA_FILE = "meta.json"
 
 
 def load_meta_file(dataset_path: Path):
@@ -22,9 +22,9 @@ def load_meta_file(dataset_path: Path):
     """
     meta_file_path = dataset_path / META_DATA_FILE
     if not meta_file_path.exists():
-        raise FileNotFoundError(f'File ({meta_file_path} does not exits!')
+        raise FileNotFoundError(f"File ({meta_file_path} does not exits!")
 
-    with open(meta_file_path, 'r') as meta_file:
+    with open(meta_file_path, "r") as meta_file:
         meta = json.load(meta_file)
     return meta
 
@@ -38,12 +38,13 @@ def reset_tar_info(tar_info: tarfile.TarInfo):
     """
 
     RESET_FIELDS = {
-        'mtime': 0,
-        'mode': 420,
-        'uid': 0,
-        'gid': 0,
-        'uname': '',
-        'gname': '',
+        "mtime": 0,
+        "mode": 420,
+        "uid": 0,
+        "gid": 0,
+        "uname": "",
+        "gname": "",
+        "pax_headers": {},
     }
 
     for key, default_value in RESET_FIELDS.items():
@@ -65,45 +66,43 @@ def md5(file: PathLike) -> str:
     return hash_md5.hexdigest()
 
 
-def archive_raw_dataset(source_path: Path, archive_path: Path):
+COMPRESSION_TYPE = "gz"
+
+
+def archive_raw_dataset(
+    source_path: Path, archive_path: Path, archive_name: str = "data"
+):
     f"""
-    Create a tar containing all files in source path except {META_DATA_FILE} and removes the file system specific info
-    :param source_path: 
-    :param archive_path: 
-    :return: 
+    Create a tar containing all files in source path except {META_DATA_FILE} and
+    removes the file system specific info
+    :param source_path:
+    :param archive_path:
+    :return:
     """
-    all_but_meta = lambda tar_info: reset_tar_info(tar_info) if tar_info.name != META_DATA_FILE else None
-    with tarfile.open(archive_path, 'x', format=tarfile.GNU_FORMAT) as tar_file:
-        tar_file.add(source_path, filter=all_but_meta)
+    all_but_meta = (
+        lambda tar_info: reset_tar_info(tar_info)
+        if tar_info.name != os.path.join(archive_name, META_DATA_FILE)
+        else None
+    )
+    tar_file_path = archive_path / f"{archive_name}.tar.{COMPRESSION_TYPE}"
+    with tarfile.open(tar_file_path, f"x:{COMPRESSION_TYPE}") as tar_file:
+        tar_file.add(source_path, arcname="data", filter=all_but_meta)
+    return tar_file_path
 
 
-def _archive_raw_dataset(source_path: Path, archive_path: Path):
-    f"""
-    Create a tar containing all files in source path except {META_DATA_FILE} and removes the file system specific info
-    :param source_path: 
-    :param archive_path: 
-    :return: 
-    """
-    all_but_meta = filter(lambda file: file.name != META_DATA_FILE ,source_path.rglob('*'))
-    with ZipFile(archive_path, 'w') as archive_file:
-        for f in all_but_meta:
-            archive_file.write(f, all_but_meta)
-
-def tar_archive_dataset(archive_path :Path, archive_name : str, files : List[Tuple[PathLike, str]]):
-    result_archive_file = archive_path / f'{archive_name}.tar'
-    with tarfile.open(result_archive_file, 'x:gz') as tar_file:
+def tar_archive_dataset(
+    archive_path: Path, archive_name: str, files: List[Tuple[PathLike, str]]
+):
+    result_archive_file = archive_path / f"{archive_name}.tar"
+    with tarfile.open(result_archive_file, "x:gz") as tar_file:
         for file, name in files:
             tar_file.add(file, arcname=name)
     return result_archive_file
 
-def zip_archive_dataset(archive_path :Path, archive_name : str, files : List[Tuple[PathLike, str]]):
-    result_archive_file = archive_path / f'{archive_name}.tar'
-    with tarfile.open(result_archive_file, 'x:gz') as tar_file:
-        for file, name in files:
-            tar_file.add(file, arcname=name)
-    return result_archive_file
 
-def archive_dataset(source_path: Path, archive_path: Path, meta_json: dict = None) -> Path:
+def archive_dataset(
+    source_path: Path, archive_path: Path, meta_json: dict = None
+) -> Path:
     """
 
     :param source_path:
@@ -120,30 +119,31 @@ def archive_dataset(source_path: Path, archive_path: Path, meta_json: dict = Non
 
         # create data gz.tar (everything) within the source path (meta.json) in temp dir
         source_dir_name = source_path.name
-        data_tar_name = f'{source_dir_name}.tar.gz'
-        temp_tar = tempdir / data_tar_name
-        archive_raw_dataset(source_path, temp_tar)
+        temp_tar = archive_raw_dataset(source_path, tempdir)
 
         # create the meta.json and update with meta_json and exiting data
-        new_meta = {
-            'name': source_dir_name
-        }
+        new_meta = {"name": source_dir_name}
         try:
             source_meta = load_meta_file(source_path)
-        except FileNotFoundError as e:
+        except FileNotFoundError:
             source_meta = {}
-        source_meta['source']: source_meta.get('name', '') + source_meta.get('md5checksum', '')
+        source_meta["source"] = source_meta.get("name", "") + source_meta.get(
+            "creation_date", ""
+        )
         new_meta.update(source_meta)
         new_meta.update(meta_json)
-        new_meta.update({
-            'creation_date': datetime.now().isoformat(),
-            'md5checksum': md5(temp_tar)
-        })
+        new_meta.update(
+            {"creation_date": datetime.now().isoformat(), "md5checksum": md5(temp_tar)}
+        )
         meta_file = tempdir / META_DATA_FILE
-        with open(meta_file, 'w') as f:
+        with open(meta_file, "w") as f:
             json.dump(new_meta, f)
 
         # create resulting tar in dataset_path
-        archive_name = '_'.join([new_meta['name'], new_meta['creation_date']])
+        archive_name = "_".join([new_meta["name"], new_meta["creation_date"]])
 
-        return result_archive_file
+        return tar_archive_dataset(
+            archive_path,
+            archive_name,
+            [(meta_file, META_DATA_FILE), (temp_tar, temp_tar.name)],
+        )
