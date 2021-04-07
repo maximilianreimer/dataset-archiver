@@ -1,0 +1,5 @@
+{
+  "name": "movies debug",
+  "source": "https://storage.googleapis.com/sfr-nazneen-website-files-research/data_v1.2.tar.gz",
+  "description" : "A subset of 100 annotation in each split for debugging (here also without the docs)"
+}
