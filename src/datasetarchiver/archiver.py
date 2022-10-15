@@ -153,7 +153,26 @@ def extract_dataset(archive_path: Path, target_path: Path):
     with tempfile.TemporaryDirectory() as temp_dir:
         temp_dir = Path(temp_dir)
         with tarfile.open(archive_path, "r") as archive_file:
-            archive_file.extractall(temp_dir)
+            def is_within_directory(directory, target):
+                
+                abs_directory = os.path.abspath(directory)
+                abs_target = os.path.abspath(target)
+            
+                prefix = os.path.commonprefix([abs_directory, abs_target])
+                
+                return prefix == abs_directory
+            
+            def safe_extract(tar, path=".", members=None, *, numeric_owner=False):
+            
+                for member in tar.getmembers():
+                    member_path = os.path.join(path, member.name)
+                    if not is_within_directory(path, member_path):
+                        raise Exception("Attempted Path Traversal in Tar File")
+            
+                tar.extractall(path, members, numeric_owner=numeric_owner) 
+                
+            
+            safe_extract(archive_file, temp_dir)
 
         meta = load_meta_file(temp_dir)
         dataset_path = target_path / meta["name"]
@@ -161,6 +180,25 @@ def extract_dataset(archive_path: Path, target_path: Path):
 
         shutil.copy(temp_dir / META_DATA_FILE, dataset_path / META_DATA_FILE)
         with tarfile.open(temp_dir / "data.tar.gz") as data_tar:
-            data_tar.extractall(dataset_path)
+            def is_within_directory(directory, target):
+                
+                abs_directory = os.path.abspath(directory)
+                abs_target = os.path.abspath(target)
+            
+                prefix = os.path.commonprefix([abs_directory, abs_target])
+                
+                return prefix == abs_directory
+            
+            def safe_extract(tar, path=".", members=None, *, numeric_owner=False):
+            
+                for member in tar.getmembers():
+                    member_path = os.path.join(path, member.name)
+                    if not is_within_directory(path, member_path):
+                        raise Exception("Attempted Path Traversal in Tar File")
+            
+                tar.extractall(path, members, numeric_owner=numeric_owner) 
+                
+            
+            safe_extract(data_tar, dataset_path)
 
         return dataset_path
